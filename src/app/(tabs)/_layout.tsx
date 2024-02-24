@@ -1,11 +1,14 @@
-import React from "react";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Link, Tabs } from "expo-router";
+import React from "react";
 import { Pressable } from "react-native";
 
-import Colors from "../../constants/Colors";
-import { useColorScheme } from "../../components/useColorScheme";
 import { useClientOnlyValue } from "../../components/useClientOnlyValue";
+import { useColorScheme } from "../../components/useColorScheme";
+import Colors from "../../constants/Colors";
+import { BottomTabBar } from "@react-navigation/bottom-tabs";
+import { View } from "@/src/components/Themed";
+import Player from "@/src/components/Player";
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -26,6 +29,12 @@ export default function TabLayout() {
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
       }}
+      tabBar={(props) => (
+        <View>
+          <Player />
+          <BottomTabBar {...props} />
+        </View>
+      )}
     >
       <Tabs.Screen
         name="index"
