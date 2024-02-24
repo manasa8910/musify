@@ -1,18 +1,69 @@
-import { StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { tracks } from "../../assets/data/tracks";
-import { Text, View } from "./Themed";
+import { AVPlaybackStatus, Audio } from "expo-av";
+import { Sound } from "expo-av/build/Audio";
+import { useEffect, useState } from "react";
+import { Image, StyleSheet } from "react-native";
 import { usePlayerContext } from "../providers/PlayerProvider";
+import { Text, View } from "./Themed";
 
 const Player = () => {
+  const [sound, setSound] = useState<Sound>();
   const { track } = usePlayerContext();
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    playTrack();
+  }, [track]);
+
+  //when application closes or unmounts, we should prevent memory leaks
+  useEffect(() => {
+    return sound
+      ? () => {
+          console.log("unloading sound");
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
+
+  const playTrack = async () => {
+    if (sound) {
+      await sound.unloadAsync();
+    }
+
+    if (!track?.preview_url) return null;
+    console.log("Playing:", track.name);
+    const { sound: newSound } = await Audio.Sound.createAsync({
+      uri: track.preview_url,
+    });
+
+    setSound(newSound);
+    newSound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
+
+    await newSound.playAsync();
+  };
 
   if (!track) {
     return null;
   }
-
+  const onPlayPause = async () => {
+    if (!sound) {
+      return;
+    }
+    if (isPlaying) {
+      await sound.pauseAsync();
+    } else {
+      await sound.playAsync();
+    }
+  };
   const image = track.album.images?.[0];
 
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) {
+      return;
+    }
+
+    setIsPlaying(status.isPlaying);
+  };
   return (
     <View style={styles.container}>
       <View style={styles.player}>
@@ -30,8 +81,9 @@ const Player = () => {
           style={{ marginHorizontal: 10 }}
         />
         <Ionicons
+          onPress={onPlayPause}
           disabled={!track?.preview_url}
-          name={"play"}
+          name={isPlaying ? "pause" : "play"}
           size={22}
           color={track?.preview_url ? "white" : "gray"}
         />
