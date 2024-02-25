@@ -1,13 +1,52 @@
-import { FlatList, StyleSheet, TextInput } from "react-native";
-import { tracks } from "../../../assets/data/tracks";
-import TrackListItem from "@/src/components/TrackListItem";
-import { View, Text } from "@/src/components/Themed";
+import {
+  FlatList,
+  TextInput,
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import TrackListItem from "../../components/TrackListItem";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 import { useState } from "react";
+import { gql, useQuery } from "@apollo/client";
 
-export default function HomeScreen() {
+const query = gql`
+  query MyQuery($q: String!) {
+    search(q: $q) {
+      tracks {
+        items {
+          id
+          name
+          preview_url
+          artists {
+            id
+            name
+          }
+          album {
+            id
+            name
+            images {
+              url
+              width
+              height
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export default function SearchScreen() {
   const [search, setSearch] = useState("");
+
+  const { data, loading, error } = useQuery(query, {
+    variables: { q: search },
+  });
+
+  const tracks = data?.search?.tracks?.items || [];
 
   return (
     <SafeAreaView>
@@ -16,20 +55,19 @@ export default function HomeScreen() {
         <FontAwesome name="search" size={16} color="gray" />
         <TextInput
           value={search}
+          placeholderTextColor={"gray"}
           onChangeText={setSearch}
-          placeholderTextColor="gray"
-          placeholder="what do you want to listen to?"
+          placeholder="What do you want to listen to?"
           style={styles.input}
         />
-        <Text
-          onPress={() => {
-            setSearch("");
-          }}
-          style={{ color: "white" }}
-        >
+        <Text onPress={() => setSearch("")} style={{ color: "white" }}>
           Cancel
         </Text>
       </View>
+
+      {loading && <ActivityIndicator />}
+      {error && <Text>Failed to fetch tracks</Text>}
+
       <FlatList
         data={tracks}
         renderItem={({ item }) => <TrackListItem track={item} />}

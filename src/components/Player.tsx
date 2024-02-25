@@ -1,25 +1,61 @@
+import { View, Text, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { usePlayerContext } from "../providers/PlayerProvider";
+import { useEffect, useState } from "react";
 import { AVPlaybackStatus, Audio } from "expo-av";
 import { Sound } from "expo-av/build/Audio";
-import { useEffect, useState } from "react";
-import { Image, StyleSheet } from "react-native";
-import { usePlayerContext } from "../providers/PlayerProvider";
-import { Text, View } from "./Themed";
+import { gql, useMutation, useQuery } from "@apollo/client";
+
+const insertFavoriteMutation = gql`
+  mutation MyMutation($userId: String!, $trackId: String!) {
+    insertFavorites(userid: $userId, trackid: $trackId) {
+      id
+      trackid
+      userid
+    }
+  }
+`;
+
+const removeFavoriteMutation = gql`
+  mutation MyMutation($trackId: String!, $userId: String!) {
+    deleteFavorites(trackid: $trackId, userid: $userId) {
+      id
+    }
+  }
+`;
+
+const isFavoriteQuery = gql`
+  query MyQuery($trackId: String!, $userId: String!) {
+    favoritesByTrackidAndUserid(trackid: $trackId, userid: $userId) {
+      id
+      trackid
+      userid
+    }
+  }
+`;
 
 const Player = () => {
   const [sound, setSound] = useState<Sound>();
-  const { track } = usePlayerContext();
   const [isPlaying, setIsPlaying] = useState(false);
+  const { track } = usePlayerContext();
+
+  const [insertFavorite] = useMutation(insertFavoriteMutation);
+  const [removeFavorite] = useMutation(removeFavoriteMutation);
+
+  const { data, refetch } = useQuery(isFavoriteQuery, {
+    variables: { userId: "vadim", trackId: track?.id || "" },
+  });
+  // const isLiked = data?.favoritesByTrackidAndUserid?.length > 0;
+  const [isLiked, setIsLiked] = useState(false);
 
   useEffect(() => {
     playTrack();
   }, [track]);
 
-  //when application closes or unmounts, we should prevent memory leaks
   useEffect(() => {
     return sound
       ? () => {
-          console.log("unloading sound");
+          console.log("Unloading Sound");
           sound.unloadAsync();
         }
       : undefined;
@@ -30,21 +66,26 @@ const Player = () => {
       await sound.unloadAsync();
     }
 
-    if (!track?.preview_url) return null;
-    console.log("Playing:", track.name);
+    if (!track?.preview_url) {
+      return;
+    }
     const { sound: newSound } = await Audio.Sound.createAsync({
       uri: track.preview_url,
     });
 
     setSound(newSound);
     newSound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
-
     await newSound.playAsync();
   };
 
-  if (!track) {
-    return null;
-  }
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) {
+      return;
+    }
+
+    setIsPlaying(status.isPlaying);
+  };
+
   const onPlayPause = async () => {
     if (!sound) {
       return;
@@ -55,15 +96,28 @@ const Player = () => {
       await sound.playAsync();
     }
   };
+
+  const onLike = async () => {
+    setIsLiked(!isLiked);
+    // if (!track) return;
+    // if (isLiked) {
+    //   await removeFavorite({
+    //     variables: { userId: "vadim", trackId: track.id },
+    //   });
+    // } else {
+    //   await insertFavorite({
+    //     variables: { userId: "vadim", trackId: track.id },
+    //   });
+    // }
+    // refetch();
+  };
+
+  if (!track) {
+    return null;
+  }
+
   const image = track.album.images?.[0];
 
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) {
-      return;
-    }
-
-    setIsPlaying(status.isPlaying);
-  };
   return (
     <View style={styles.container}>
       <View style={styles.player}>
@@ -75,7 +129,8 @@ const Player = () => {
         </View>
 
         <Ionicons
-          name={"heart-outline"}
+          onPress={onLike}
+          name={isLiked ? "heart" : "heart-outline"}
           size={20}
           color={"white"}
           style={{ marginHorizontal: 10 }}
@@ -95,11 +150,10 @@ const Player = () => {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    width: "100%",
     top: -75,
+    width: "100%",
     height: 75,
     padding: 10,
-    backgroundColor: "transparent",
   },
   player: {
     backgroundColor: "#286660",
@@ -112,12 +166,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "white",
-    backgroundColor: "#286660",
   },
   subtitle: {
     color: "lightgray",
     fontSize: 12,
-    backgroundColor: "#286660",
   },
   image: {
     height: "100%",
